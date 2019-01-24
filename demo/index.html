@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>at-core-state demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="../../webcomponentsjs/webcomponents-lite.js"></script>
+  <link rel="import" href="../at-core-state.html">
+</head>
+<body>
+  
+  <at-core-state id="elt"></at-core-state>
+
+  <div>
+    <h3>Output</h3>
+    <pre id="output"></pre>
+  </div>
+
+  <script>
+    document.addEventListener('WebComponentsReady', function() {
+      var url = "http://localhost:2014/api/adenin.GateKeeper.Content/service";
+      var elt = document.getElementById('elt');
+      var output = document.getElementById('output');
+
+      elt.addEventListener('response', function(event) {
+        var detail = event.detail;
+
+        output.textContent = JSON.stringify(detail.response, null, ' ');
+      });
+      
+      elt.addEventListener('error', function(event) {
+        var detail = event.detail;
+        
+        output.innerHTML = JSON.stringify(detail.error.message, null, ' ');
+      });
+
+      elt.addRequest({ url: url, name: "request1" });
+      elt.addRequest({ url: url, name: "request2" });
+      elt.addRequest({ url: url, name: "request3" });
+      elt.addRequest({ url: url, name: "request4" });
+      elt.addRequest({ url: url, name: "request5" });
+      
+      elt.addRequest({ url: url });
+      elt.addRequest({ url: url });
+      elt.addRequest({ url: url });
+      elt.addRequest({ url: url });
+      elt.addRequest({ url: url });
+
+    });
+    
+    
+
+
+  </script>
+
+</body>
+</html>

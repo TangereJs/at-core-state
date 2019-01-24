@@ -1,0 +1,67 @@
+<link rel="import" href="../tangere/tangere.html" />
+<link rel="import" href="../at-core-activity-queue/at-core-activity-queue.html">
+<link rel="import" href="../at-core-signals/at-core-signals.html">
+
+<dom-module id="at-core-state">
+  <template>
+    <style>
+      :host {
+        display: block;
+        box-sizing: border-box;
+      }
+    </style>
+    
+    <at-core-signals id="coreSignals" on-state-request="_handleStateRequest" on-state-push="_handleStatePush"></at-core-signals>
+    <at-core-activity-queue id="activityQueue" on-response="_handleActivityResponse" on-error="_handleActivityError"></at-core-activity-queue>
+    
+  </template>
+</dom-module>
+<script>
+  Polymer({
+    is: "at-core-state",
+    properties: {
+
+    },
+    
+    created: function() {
+      // 
+      // cached data should hold responses for named requests
+      // 
+      if (this._cachedData == undefined) {
+        this._cachedData = {};
+      }
+    },
+
+    ready: function() {
+
+    },
+
+    _handleStateRequest: function(event) {
+      var stateRequest = event.detail;
+      this.$.activityQueue.addRequest(stateRequest);
+    },
+
+    _handleActivityResponse: function(event) {
+      var response = event.detail;
+      
+      this._cachedData[response.name] = response;
+
+      Polymer.signal('state-update', response);
+    },
+
+    _handleActivityError: function(error) {
+      debugger
+    },
+
+    _handleStatePush: function(event) {
+      var state = event.detail;
+
+      this._cachedData[state.name] = state;
+
+      this.async(function() {
+        Polymer.signal('state-update', state);
+      });
+    },
+
+  });
+</script>
