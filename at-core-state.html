@@ -54,9 +54,20 @@
     _handleActivityResponse: function(event) {
       var response = event.detail;
       
-      this._cachedData[response.name] = response;
+      var existing = this._cachedData[response.name];
+      if (!existing) {
+        this._cachedData[response.name] = {
+          version: 1,
+          data: response
+        };
+        existing = this._cachedData[response.name];
+      
+      } else {
+        existing.version += 1;
+        existing.data = response;
+      }
 
-      Polymer.signal('state-update', response);
+      Polymer.signal('state-update', existing);
     },
 
     _handleActivityError: function(error) {
@@ -66,10 +77,20 @@
     _handleStatePush: function(event) {
       var state = event.detail;
 
-      this._cachedData[state.name] = state;
+      var existing = this._cachedData[state.name];
+      if (!existing) {
+        existing = this._cachedData[state.name] = {
+          version: 1,
+          data: state
+        };
+      
+      } else {
+        existing.version += 1;
+        existing.data = state;
+      }
 
       this.async(function() {
-        Polymer.signal('state-update', state);
+        Polymer.signal('state-update', existing);
       });
     },
 
