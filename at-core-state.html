@@ -39,7 +39,7 @@
     _handleStateRequest: function(event) {
       var stateRequest = event.detail;
 
-      if (this._cachedData[stateRequest.name] != undefined) {
+      if (!stateRequest.bypassCache && this._cachedData[stateRequest.name] != undefined) {
         var response = this._cachedData[stateRequest.name];
         this.async(function() {
           Polymer.signal('state-update', response);
