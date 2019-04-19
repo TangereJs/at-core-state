@@ -30,6 +30,11 @@
       if (this._cachedData == undefined) {
         this._cachedData = {};
       }
+
+      // sentRequestCache holds sent requests so that they are not duplicated
+      if (this._sentRequestCache == undefined) {
+        this._sentRequestCache = { };
+      }
     },
 
     ready: function() {
@@ -48,7 +53,11 @@
         return;
       }
 
-      this.$.activityQueue.addRequest(stateRequest);
+      // add request to queue only if it wasn't already sent
+      if (this._sentRequestCache[stateRequest.name] == undefined) {
+        this.$.activityQueue.addRequest(stateRequest);
+        this._cacheSentRequest(stateRequest);
+      }
     },
 
     _handleActivityResponse: function(event) {
@@ -92,6 +101,18 @@
       this.async(function() {
         Polymer.signal('state-update', existing);
       });
+    },
+
+    _cacheSentRequest: function (stateRequest) {
+
+      var existing = this._sentRequestCache[stateRequest.name];
+
+      if (!existing) {
+        this._sentRequestCache[stateRequest.name] = {
+          data: stateRequest
+        };
+      }
+
     },
 
   });
