@@ -27,14 +27,10 @@
       // 
       // cached data should hold responses for named requests
       // 
-      if (this._cachedData == undefined) {
-        this._cachedData = {};
+      if (this._state == undefined) {
+        this._state = {};
       }
 
-      // sentRequestCache holds sent requests so that they are not duplicated
-      if (this._sentRequestCache == undefined) {
-        this._sentRequestCache = { };
-      }
     },
 
     ready: function() {
@@ -44,41 +40,88 @@
     _handleStateRequest: function(event) {
       var stateRequest = event.detail;
 
-      if (!stateRequest.bypassCache && this._cachedData[stateRequest.name] != undefined) {
-        var response = this._cachedData[stateRequest.name];
-        this.async(function() {
-          Polymer.signal('state-update', response);
-        });  
+      var cachedState = this._state[stateRequest.name];
 
+      var currentTimeStamp = Math.floor(Date.now());
+      var secondsPassed = 0;
+
+      // If the request is cached and answered -> calculate secondsPassed
+      if (cachedState != undefined && cachedState.status == "Answered") {
+        secondsPassed = Math.floor(((currentTimeStamp - cachedState.cacheTimeStamp) / 1000) % 60);
+      }
+      
+      // If the request is not cached -> send a new request, add it to cache and set request.Status to "Sent"
+      if (cachedState == undefined) {
+        this._cacheStateRequest(stateRequest);
+        this.$.activityQueue.addRequest(stateRequest);
+      }
+
+      // If the request is cached and unanswered -> do not send a new request
+      if (cachedState != undefined && cachedState.status == "Sent") {
         return;
       }
 
-      // add request to queue only if it wasn't already sent
-      if (this._sentRequestCache[stateRequest.name] == undefined) {
+      // If the request is cached and answered within last 5 seconds -> return cached response
+      if (cachedState != undefined && secondsPassed < 5 && cachedState.status == "Answered") {
+        var response = this._state[stateRequest.name];
+        this.async(function () {
+          Polymer.signal('state-update', response);
+        });
+
+        return
+      }
+
+      // If the request is cached and not answered within last 5 seconds -> clear cache and send a new request
+      if (cachedState != undefined && secondsPassed > 5 && cachedState.status == "Answered") {
+        this._clearStateRequestFromCache(stateRequest);
+        this._cacheStateRequest(stateRequest);
         this.$.activityQueue.addRequest(stateRequest);
-        this._cacheSentRequest(stateRequest);
+      }
+
+    },
+
+    _cacheStateRequest: function (stateRequest) {
+      var existing = this._state[stateRequest.name];
+
+      if (!existing) {
+        this._state[stateRequest.name] = {
+          status: "Sent",
+        };
+      }
+    },
+
+    _clearStateRequestFromCache: function (stateRequest) {
+      var existing = this._state[stateRequest.name];
+
+      if (existing) {
+        delete this._state[stateRequest.name];
       }
     },
 
     _handleActivityResponse: function(event) {
       var response = event.detail;
+
+      var responseTimeStamp = Math.floor(Date.now());
       
-      var existing = this._cachedData[response.name];
-      if (!existing) {
-        this._cachedData[response.name] = {
+      var existing = this._state[response.name];
+      if (existing.status == "Sent") {
+        this._state[response.name] = {
           version: 1,
-          data: response
+          data: response,
+          status: "Answered",
+          cacheTimeStamp: responseTimeStamp
         };
-        existing = this._cachedData[response.name];
-      
+        existing = this._state[response.name];
+
       } else {
         existing.version += 1;
         existing.data = response;
+        existing.status = "Answered";
       }
 
       Polymer.signal('state-update', existing);
     },
-
+    
     _handleActivityError: function(error) {
       debugger
     },
@@ -86,9 +129,9 @@
     _handleStatePush: function(event) {
       var state = event.detail;
 
-      var existing = this._cachedData[state.name];
+      var existing = this._state[state.name];
       if (!existing) {
-        existing = this._cachedData[state.name] = {
+        existing = this._state[state.name] = {
           version: 1,
           data: state
         };
@@ -101,18 +144,6 @@
       this.async(function() {
         Polymer.signal('state-update', existing);
       });
-    },
-
-    _cacheSentRequest: function (stateRequest) {
-
-      var existing = this._sentRequestCache[stateRequest.name];
-
-      if (!existing) {
-        this._sentRequestCache[stateRequest.name] = {
-          data: stateRequest
-        };
-      }
-
     },
 
   });
