@@ -47,7 +47,7 @@
 
       // If the request is cached and answered -> calculate secondsPassed
       if (cachedState != undefined && cachedState.status == "Answered") {
-        secondsPassed = Math.floor(((currentTimeStamp - cachedState.cacheTimeStamp) / 1000) % 60);
+        secondsPassed = Math.floor((currentTimeStamp - cachedState.cacheTimeStamp) / 1000);
       }
       
       // If the request is not cached -> send a new request, add it to cache and set request.Status to "Sent"
