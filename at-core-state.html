@@ -68,7 +68,7 @@
         this.async(function () {
           Polymer.signal('state-update', response);
         });
-        
+
         return;
       }
 
@@ -128,8 +128,44 @@
       Polymer.signal('state-update', existing);
     },
 
-    _handleActivityError: function (error) {
-      debugger
+    _handleActivityError: function (e) {
+      var stateError = e.detail;
+
+      stateError.error.handler.handled = true;
+
+      var existing = this._state[stateError.name];
+
+      // If the state doesn't exist -> cache state error
+      // If the state exists and has status equal to "Sent" -> set status to "Error" and provide error details
+      if (!existing || existing.status == "Sent") {
+
+        // handle errors where ErrorCode !=0 or where ErrorCode == 0
+        if (stateError.error.response.ErrorCode != 0 || stateError.error.response.ErrorCode == 0) {
+          this._cacheStateError(stateError);
+          var response = this._state[stateError.name];
+          this.async(function () {
+            Polymer.signal('state-error', response);
+          });
+        }
+
+      }
+
+    },
+
+    // _cacheStateError is used to cache state errors from _handleActivityError
+    _cacheStateError: function (stateError) {
+      var existing = this._state[stateError.name];
+
+      if (existing == undefined || existing.status == "Sent") {
+
+        this._state[stateError.name] = {
+          name: stateError.name,
+          errorCode: stateError.error.response.Data.ErrorCode,
+          errorText: stateError.error.response.Data.ErrorText,
+          status: "Error",
+          cacheTimeStamp: Math.floor(Date.now())
+        };
+      }
     },
 
     // _handleStatePush is used to cache data from 'state-push'
@@ -179,7 +215,7 @@
       // A state has status "Sent" when it's not responded to yet
       if (existing == undefined || existing.status == "Sent") {
         // If a state doesn't exist in the chache -> add it
-        // Set initial version -> set data -> set status to "Answered" -> set timestamp 
+        // Set initial version -> set data -> set status to "Answered" -> set timestamp
         // Setting the status to "Answered" mimics the requests that have been answered
         this._state[statePush.name] = {
           version: 1,
