@@ -65,9 +65,18 @@
       // If the request is cached and answered within last 5 seconds -> return cached response
       if (cachedState != undefined && milliSecondsPassed < 5000 && cachedState.status == "Answered") {
         var response = this._state[stateRequest.name];
-        this.async(function () {
-          Polymer.signal('state-update', response);
-        });
+
+        if (response.errorText != undefined) {
+        // If the cached state is an error -> signal 'state-error'
+          this.async(function () {
+            Polymer.signal('state-error', response);
+          });
+        } else {
+          // If the cached state is a valid response -> signal 'state-update'
+          this.async(function () {
+            Polymer.signal('state-update', response);
+          });
+        }
 
         return;
       }
@@ -146,6 +155,7 @@
           this.async(function () {
             Polymer.signal('state-error', response);
           });
+
         }
 
       }
@@ -160,11 +170,12 @@
 
         this._state[stateError.name] = {
           name: stateError.name,
-          errorCode: stateError.error.response.Data.ErrorCode,
+          errorCode: stateError.error.response.ErrorCode,
           errorText: stateError.error.response.Data.ErrorText,
-          status: "Error",
+          status: "Answered",
           cacheTimeStamp: Math.floor(Date.now())
         };
+
       }
     },
 
