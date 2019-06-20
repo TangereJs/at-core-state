@@ -40,6 +40,8 @@
     _handleStateRequest: function (event) {
       var stateRequest = event.detail;
 
+      stateRequest.name = stateRequest.url;
+
       var cachedState = this._state[stateRequest.name];
 
       var currentTimeStamp = Date.now();
@@ -182,6 +184,8 @@
     // _handleStatePush is used to cache data from 'state-push'
     _handleStatePush: function (event) {
       var state = event.detail;
+
+      state.name = state.url;
 
       var existing = this._state[state.name];
 
