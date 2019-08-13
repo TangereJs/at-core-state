@@ -64,6 +64,7 @@
 
     _cacheStateError: function (stateError) {
       var existing = this._state[stateError.name];
+
       if (existing == undefined || existing.status == "Sent") {
 
         this._state[stateError.name] = {
@@ -96,18 +97,10 @@
     _returnCachedState: function (stateName) {
       var state = this._state[stateName];
 
-      if (state.status == "Answered" || state.status == "Error") {
-        if (state.errorText != undefined) {
-          // If the cached state is an error -> signal 'state-error'
-          this.async(function () {
-            Polymer.signal('state-error', state);
-          });
-        } else {
-          // If the cached state is a valid response -> signal 'state-update'
-          this.async(function () {
-            Polymer.signal('state-update', state);
-          });
-        }
+      if (state.status == "Answered") {
+        this.async(function () {
+          Polymer.signal('state-update', state);
+        });
       }
     },
 
@@ -118,7 +111,7 @@
 
       // default cache duration in milliseconds
       var cacheDuration = 5000;
-      
+
       if (stateRequest.maxAge === 0) {
         if (this._stateExists(stateRequest.name)) {
           this._clearStateFromCache(stateRequest.name);
@@ -246,21 +239,21 @@
       }
     },
 
+    // handle activity error treba da salje state-update signal sa errorom
     _handleActivityError: function (e) {
       var stateError = e.detail;
-
       stateError.error.handler.handled = true;
-
       var existing = this._stateExists[stateError.name];
-      // If the state doesn't exist -> cache state error
-      // If the state exists and has status equal to "Sent" -> set status to "Error" and provide error details
-      if (!existing || existing.status == "Sent") {
 
-        // handle errors where ErrorCode !=0 or where ErrorCode == 0
+      // when disableErrorCodeHandler is true -> cache a response and signal 'state-update'
+      if (existing != undefined && existing.disableErrorCodeHandler == true) {
         if (stateError.error.response.ErrorCode != 0 || stateError.error.response.ErrorCode == 0) {
           this._cacheStateError(stateError);
           this._returnCachedState(stateError.name);
         }
+      } else {
+        // disabledErrorCodeHandler is false -> do not cache and do not signal 'state-error'
+        return;
       }
     },
 
