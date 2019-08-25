@@ -47,6 +47,7 @@
 
     _cacheStatePush: function (statePush) {
       var existing = this._state[statePush.name];
+
       // Check if state is cached or if it has status equal to "Sent"
       // A state has status "Sent" when it's not responded to yet
       if (existing == undefined || existing.status == "Sent") {
@@ -96,40 +97,38 @@
 
     _returnCachedState: function (stateName) {
       var state = this._state[stateName];
+      //console.log("state cached answer " + stateName);     
 
       if (state.status == "Answered") {
         this.async(function () {
+          //console.log("state answer async " + stateName);
           Polymer.signal('state-update', state);
         });
       }
     },
 
-    _handleStateRequest: function (event) {
-      var stateRequest = event.detail;
+    _queueRequest: function (stateRequest) {
+      //console.log("_queueRequest");
+      this._cacheStateRequest(stateRequest);
+      this.$.activityQueue.addRequest(stateRequest);
+    },
 
+    _handleStateRequest: function (event) {
+
+      var stateRequest = event.detail;
       stateRequest.name = stateRequest.url;
+      //console.log("state request " + stateRequest.name);
 
       // default cache duration in milliseconds
       var cacheDuration = 5000;
-
-      if (stateRequest.maxAge === 0) {
-        if (this._stateExists(stateRequest.name)) {
-          this._clearStateFromCache(stateRequest.name);
-        }
-
-        this._cacheStateRequest(stateRequest);
-        this.$.activityQueue.addRequest(stateRequest);
-        return;
-      }
-
-      if (stateRequest.maxAge === false) {
+      
+      if (stateRequest.maxAge === 0 || stateRequest.maxAge === false) {
         if (this._stateExists(stateRequest.name)) {
           this._returnCachedState(stateRequest.name);
           return;
         }
 
-        this._cacheStateRequest(stateRequest);
-        this.$.activityQueue.addRequest(stateRequest);
+        this._queueRequest(stateRequest);
         return;
       }
 
@@ -150,8 +149,7 @@
 
       // If the request is not cached -> send a new request, add it to cache and set request.Status to "Sent"
       if (cachedState == undefined) {
-        this._cacheStateRequest(stateRequest);
-        this.$.activityQueue.addRequest(stateRequest);
+        this._queueRequest(stateRequest);
         return;
       }
 
@@ -169,20 +167,20 @@
       // If the request is cached and not requested within last 5 seconds -> clear cache and send a new request
       if (cachedState != undefined && milliSecondsPassed > cacheDuration && cachedState.status == "Answered") {
         this._clearStateFromCache(stateRequest.name);
-        this._cacheStateRequest(stateRequest);
-        this.$.activityQueue.addRequest(stateRequest);
+        this._queueRequest(stateRequest);
         return;
       }
     },
 
     _handleStatePush: function (event) {
+
       var statePush = event.detail;
-
-      statePush.name = statePush.url;
-
       var cacheDuration = 5000;
 
-      if (statePush.maxAge === 0) {
+      statePush.name = statePush.url;
+      //console.log("state push " + statePush.name);
+      
+      if (statePush.maxAge === 0 || statePush.maxAge === false) {
         if (this._stateExists(statePush.name)) {
           this._clearStateFromCache(statePush.name);
         }
@@ -191,18 +189,7 @@
         this._returnCachedState(statePush.name);
         return;
       }
-
-      if (statePush.maxAge === false) {
-        if (this._stateExists(statePush.name)) {
-          this._returnCachedState(statePush.name);
-          return;
-        }
-
-        this._cacheStatePush(statePush);
-        this._returnCachedState(statePush.name);
-        return;
-      }
-
+      
       // If maxAge = undefined, use default cacheDuration
       if (statePush.maxAge !== 0 && statePush.maxAge !== false && statePush.maxAge !== undefined) {
         cacheDuration = statePush.maxAge * 1000;
@@ -258,10 +245,9 @@
     },
 
     _handleActivityResponse: function (event) {
+
       var response = event.detail;
-
       var responseTimeStamp = Math.floor(Date.now());
-
       var existing = this._state[response.name];
 
       // When activity response is received, change existing cache state's status to "Answered" and set it's data and timestamp values.
@@ -273,12 +259,14 @@
           cacheTimeStamp: responseTimeStamp,
         };
         existing = this._state[response.name];
+
       } else {
         existing.version += 1;
         existing.data = response;
         existing.status = "Answered";
       }
 
+      //console.log("state receive " + response.name);
       Polymer.signal('state-update', existing);
     },
 
