@@ -29,6 +29,7 @@
       //
       if (this._state == undefined) {
         this._state = {};
+        window._state = this._state;
       }
 
     },
@@ -45,23 +46,6 @@
       }
     },
 
-    _cacheStatePush: function (statePush) {
-      var existing = this._state[statePush.name];
-
-      // Check if state is cached or if it has status equal to "Sent"
-      // A state has status "Sent" when it's not responded to yet
-      if (existing == undefined || existing.status == "Sent") {
-        // If a state doesn't exist in the chache -> add it
-        // Set initial version -> set data -> set status to "Answered" -> set timestamp
-        // Setting the status to "Answered" mimics the requests that have been answered
-        this._state[statePush.name] = {
-          version: Math.floor(Date.now()),
-          data: statePush,
-          status: "Answered",
-          cacheTimeStamp: Math.floor(Date.now())
-        };
-      }
-    },
 
     _cacheStateError: function (stateError) {
       var existing = this._state[stateError.name];
@@ -80,6 +64,7 @@
     },
 
     _clearStateFromCache: function (stateName) {
+      console.log("clear from cache: " + stateName);
       if (this._stateExists(stateName)) {
         delete this._state[stateName];
       }
@@ -95,7 +80,7 @@
       }
     },
 
-    _returnCachedState: function (stateName) {
+    _signalUpdate: function (stateName) {
       var state = this._state[stateName];
       //console.log("state cached answer " + stateName);     
 
@@ -109,6 +94,8 @@
 
     _queueRequest: function (stateRequest) {
       //console.log("_queueRequest");
+
+      // *TODO* detect if request is already sent and pending answer - in that case new request should be ignored
       this._cacheStateRequest(stateRequest);
       this.$.activityQueue.addRequest(stateRequest);
     },
@@ -120,7 +107,7 @@
       //console.log("state request " + stateRequest.name);
 
       // default cache duration in milliseconds
-      var cacheDuration = 5000;
+      var cacheDuration = 10000;
 
       // If maxAge is 0 -> always clear old state from cache if existing, cache and send a new one
       if (stateRequest.maxAge === 0) {
@@ -135,7 +122,7 @@
       // If maxAge is false -> always return cached state if existing. Otherwise, cache and send a new one
       if (stateRequest.maxAge === false) {
         if (this._stateExists(stateRequest.name)) {
-          this._returnCachedState(stateRequest.name);
+          this._signalUpdate(stateRequest.name);
           return;
         }
 
@@ -149,7 +136,7 @@
       }
 
       var cachedState = this._state[stateRequest.name];
-
+      
       var currentTimeStamp = Date.now();
       var milliSecondsPassed = 0;
 
@@ -164,19 +151,19 @@
         return;
       }
 
-      // If the request is cached and unanswered -> do not send a new request
-      if (cachedState != undefined && cachedState.status == "Sent") {
+      // If the request is cached and unanswered -> do not send a new request, wait for answser
+      if (cachedState.status == "Sent") {
         return;
       }
+
+      if (cachedState.status != "Answered") debugger; // are there any other status values then Answered and Sent ?
 
       // If the request is cached and requested within last cacheDurtion -> return cached response
-      if (cachedState != undefined && milliSecondsPassed < cacheDuration && cachedState.status == "Answered") {
-        this._returnCachedState(stateRequest.name);
+      if ( milliSecondsPassed <= cacheDuration) {
+        this._signalUpdate(stateRequest.name);
         return;
-      }
-
-      // If the request is cached and not requested within last 5 seconds -> clear cache and send a new request
-      if (cachedState != undefined && milliSecondsPassed > cacheDuration && cachedState.status == "Answered") {
+      } else  {
+        // If the request cache is expired  -> clear cache and send a new request
         this._clearStateFromCache(stateRequest.name);
         this._queueRequest(stateRequest);
         return;
@@ -186,71 +173,23 @@
     _handleStatePush: function (event) {
 
       var statePush = event.detail;
-      var cacheDuration = 5000;
+      var cacheDuration = 10000;
 
       statePush.name = statePush.url;
       //console.log("state push " + statePush.name);
 
-      // If maxAge is 0 -> always clear old state from cache if existing, cache and return a new one
-      if (statePush.maxAge === 0) {
-        if (this._stateExists(statePush.name)) {
-          this._clearStateFromCache(statePush.name);
-        }
+      
+      // Set  version -> set data -> set status to "Answered" -> set timestamp
+      // Setting the status to "Answered" mimics the requests that have been answered
+      this._state[statePush.name] = {
+        version: Math.floor(Date.now()),
+        data: statePush,
+        status: "Answered",
+        cacheTimeStamp: Math.floor(Date.now())
+      };
 
-        this._cacheStatePush(statePush);
-        this._returnCachedState(statePush.name);
-        console.log("Max age 0 handled.")
-        return;
-      }
+      this._signalUpdate(statePush.name);
 
-      // If maxAge is false -> always return cached state if existing. Otherwise, cache and send a new one
-      if (statePush.maxAge === false) {
-        if (this._stateExists(statePush.name)) {
-          this._returnCachedState(statePush.name);
-          console.log("Max age false handled - returning cached.")
-          return;
-        }
-
-        this._cacheStatePush(statePush);
-        this._returnCachedState(statePush.name);
-        console.log("Max age false handled - cache new and return it.")
-        return;
-      }
-
-      // If maxAge = undefined, use default cacheDuration
-      if (statePush.maxAge !== 0 && statePush.maxAge !== false && statePush.maxAge !== undefined) {
-        cacheDuration = statePush.maxAge * 1000;
-      }
-
-      var cachedState = this._state[statePush.name];
-
-      // Clear cache if 5 seconds have passed
-      var currentTimeStamp = Date.now();
-      var milliSecondsPassed = 0;
-
-      // If the request is cached and answered -> calculate milliSecondsPassed
-      if (cachedState != undefined && cachedState.status == "Answered") {
-        milliSecondsPassed = currentTimeStamp - cachedState.cacheTimeStamp;
-      }
-
-      // If there is no state with such name, cache this state and signal an update
-      if (cachedState == undefined) {
-        this._cacheStatePush(statePush);
-        this._returnCachedState(statePush.name);
-        return;
-      }
-
-      // If there is cached state with status "Answered" that is requested within cacheDuration seconds -> don't signal an update
-      if (cachedState != undefined && cachedState.status == "Answered" && milliSecondsPassed < cacheDuration) {
-        return;
-      }
-
-      // If 'state-push' is issued after cacheDuration seconds since of last cached state -> clear the old one from cache, add a new one and signal an update
-      if (cachedState != undefined && cachedState.status == "Answered" && milliSecondsPassed > cacheDuration) {
-        this._clearStateFromCache(statePush.name);
-        this._cacheStatePush(statePush);
-        this._returnCachedState(statePush.name);
-      }
     },
 
     // handle activity error should send state-update signal with error
@@ -263,7 +202,7 @@
       if (existing != undefined && existing.disableErrorCodeHandler == true) {
         if (stateError.error.response.ErrorCode != 0 || stateError.error.response.ErrorCode == 0) {
           this._cacheStateError(stateError);
-          this._returnCachedState(stateError.name);
+          this._signalUpdate(stateError.name);
         }
       } else {
         // disabledErrorCodeHandler is false -> do not cache and do not signal 'state-error'
