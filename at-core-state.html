@@ -112,6 +112,12 @@
       // If maxAge is 0 -> always clear old state from cache if existing, cache and send a new one
       if (stateRequest.maxAge === 0) {
         if (this._stateExists(stateRequest.name)) {
+          var existing = this._state[stateRequest.name];
+
+          if (existing.status == 'Sent') {
+            return;
+          }
+
           this._clearStateFromCache(stateRequest.name);
         }
 
