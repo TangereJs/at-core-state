@@ -29,7 +29,7 @@
       //
       if (this._state == undefined) {
         this._state = {};
-        Tangere._state = this._state;
+        window._state = this._state;
       }
 
     },
@@ -38,25 +38,17 @@
 
     },
 
-    _cacheStateRequest: function (stateRequest) {
-      if (!this._stateExists(stateRequest.name)) {
-        this._state[stateRequest.name] = {
-          status: "Sent",
-        };
-      }
-    },
-
 
     _cacheStateError: function (stateError) {
       var existing = this._state[stateError.name];
 
-      if (existing == undefined || existing.status == "Sent") {
+      if (existing == undefined || existing.answerPending == true) {
 
         this._state[stateError.name] = {
           name: stateError.name,
           errorCode: stateError.error.response.ErrorCode,
           errorText: stateError.error.response.Data.ErrorText,
-          status: "Answered",
+          answerPending: false,
           cacheTimeStamp: Math.floor(Date.now())
         };
 
@@ -64,7 +56,7 @@
     },
 
     _clearStateFromCache: function (stateName) {
-      console.log("clear from cache: " + stateName);
+      //console.log("clear from cache: " + stateName);
       if (this._stateExists(stateName)) {
         delete this._state[stateName];
       }
@@ -84,7 +76,7 @@
       var state = this._state[stateName];
       //console.log("state cached answer " + stateName);     
 
-      if (state.status == "Answered") {
+      if (state.answerPending == false) {
         this.async(function () {
           //console.log("state answer async " + stateName);
           Polymer.signal('state-update', state);
@@ -92,12 +84,15 @@
       }
     },
 
-    _queueRequest: function (stateRequest) {
-      //console.log("_queueRequest");
+    _requestQueueAndCache: function (stateRequest) {
+      //console.log("_requestQueueAndCache");
+      // cache state request
+      if (!this._stateExists(stateRequest.name)) {
+        this._state[stateRequest.name] = {};
+      }
 
-      // *TODO* detect if request is already sent and pending answer - in that case new request should be ignored
-      this._cacheStateRequest(stateRequest);
       this.$.activityQueue.addRequest(stateRequest);
+      this._state[stateRequest.name].answerPending = true;
     },
 
     _handleStateRequest: function (event) {
@@ -114,14 +109,14 @@
         if (this._stateExists(stateRequest.name)) {
           var existing = this._state[stateRequest.name];
 
-          if (existing.status == 'Sent') {
+          if (existing.answerPending == true) {
             return;
           }
 
           this._clearStateFromCache(stateRequest.name);
         }
 
-        this._queueRequest(stateRequest);
+        this._requestQueueAndCache(stateRequest);
         return;
       }
 
@@ -132,7 +127,7 @@
           return;
         }
 
-        this._queueRequest(stateRequest);
+        this._requestQueueAndCache(stateRequest);
         return;
       }
 
@@ -147,22 +142,22 @@
       var milliSecondsPassed = 0;
 
       // If the request is cached and answered -> calculate milliSecondsPassed
-      if (cachedState != undefined && cachedState.status == "Answered") {
+      if (cachedState != undefined && cachedState.answerPending == false) {
         milliSecondsPassed = currentTimeStamp - cachedState.cacheTimeStamp;;
       }
 
-      // If the request is not cached -> send a new request, add it to cache and set request.Status to "Sent"
+      // If the request is not cached -> send a new request, add it to cache and set request.answerPending to "true" (equal to "SENT")
       if (cachedState == undefined) {
-        this._queueRequest(stateRequest);
+        this._requestQueueAndCache(stateRequest);
         return;
       }
 
       // If the request is cached and unanswered -> do not send a new request, wait for answser
-      if (cachedState.status == "Sent") {
+      if (cachedState.answerPending == true) {
         return;
       }
 
-      if (cachedState.status != "Answered") debugger; // are there any other status values then Answered and Sent ?
+      if (cachedState.answerPending != false) debugger;
 
       // If the request is cached and requested within last cacheDurtion -> return cached response
       if ( milliSecondsPassed <= cacheDuration) {
@@ -171,7 +166,7 @@
       } else  {
         // If the request cache is expired  -> clear cache and send a new request
         this._clearStateFromCache(stateRequest.name);
-        this._queueRequest(stateRequest);
+        this._requestQueueAndCache(stateRequest);
         return;
       }
     },
@@ -181,16 +176,18 @@
       var statePush = event.detail;
       var cacheDuration = 10000;
 
-      statePush.name = statePush.url;
+      if (statePush.url != undefined) {
+        statePush.name = statePush.url;
+      }
       //console.log("state push " + statePush.name);
 
       
-      // Set  version -> set data -> set status to "Answered" -> set timestamp
-      // Setting the status to "Answered" mimics the requests that have been answered
+      // Set  version -> set data -> set answerPending to false -> set timestamp
+      // Setting the answerPending to false mimics the requests that have been answered
       this._state[statePush.name] = {
         version: Math.floor(Date.now()),
         data: statePush,
-        status: "Answered",
+        answerPending: false,
         cacheTimeStamp: Math.floor(Date.now())
       };
 
@@ -202,7 +199,7 @@
     _handleActivityError: function (e) {
       var stateError = e.detail;
       stateError.error.handler.handled = true;
-      var existing = this._stateExists[stateError.name];
+      var existing = this._stateExists(stateError.name);
 
       // when disableErrorCodeHandler is true -> cache a response and signal 'state-update'
       if (existing != undefined && existing.disableErrorCodeHandler == true) {
@@ -217,30 +214,8 @@
     },
 
     _handleActivityResponse: function (event) {
-      console.log("Handle activity response.");
-      var response = event.detail;
-      var responseTimeStamp = Math.floor(Date.now());
-      var existing = this._state[response.name];
-
-      // When activity response is received, change existing cache state's status to "Answered" and set it's data and timestamp values.
-      // Version is now calculated from timestamp instead of being incremented
-      if (existing.status == "Sent") {
-        this._state[response.name] = {
-          version: Math.floor(Date.now()),
-          data: response,
-          status: "Answered",
-          cacheTimeStamp: responseTimeStamp,
-        };
-        existing = this._state[response.name];
-
-      } else {
-        existing.version = Math.floor(Date.now());
-        existing.data = response;
-        existing.status = "Answered";
-      }
-
-      //console.log("state receive " + response.name);
-      Polymer.signal('state-update', existing);
+      //console.log("Handle activity response.");
+      this._handleStatePush(event);
     },
 
   });
