@@ -38,23 +38,6 @@
 
     },
 
-
-    _cacheStateError: function (stateError) {
-      var existing = this._state[stateError.name];
-
-      if (existing == undefined || existing.answerPending == true) {
-
-        this._state[stateError.name] = {
-          name: stateError.name,
-          errorCode: stateError.error.response.ErrorCode,
-          errorText: stateError.error.response.Data.ErrorText,
-          answerPending: false,
-          cacheTimeStamp: Math.floor(Date.now())
-        };
-
-      }
-    },
-
     _clearStateFromCache: function (stateName) {
       //console.log("clear from cache: " + stateName);
       if (this._stateExists(stateName)) {
@@ -88,7 +71,7 @@
       //console.log("_requestQueueAndCache");
       // cache state request
       if (!this._stateExists(stateRequest.name)) {
-        this._state[stateRequest.name] = {};
+        this._state[stateRequest.name] = stateRequest;
       }
 
       this.$.activityQueue.addRequest(stateRequest);
@@ -96,7 +79,6 @@
     },
 
     _handleStateRequest: function (event) {
-
       var stateRequest = event.detail;
       stateRequest.name = stateRequest.url;
       //console.log("state request " + stateRequest.name);
@@ -137,7 +119,6 @@
       }
 
       var cachedState = this._state[stateRequest.name];
-      
       var currentTimeStamp = Date.now();
       var milliSecondsPassed = 0;
 
@@ -172,16 +153,13 @@
     },
 
     _handleStatePush: function (event) {
-
       var statePush = event.detail;
-      var cacheDuration = 10000;
 
       if (statePush.url != undefined) {
         statePush.name = statePush.url;
       }
-      //console.log("state push " + statePush.name);
 
-      
+      //console.log("state push " + statePush.name);
       // Set  version -> set data -> set answerPending to false -> set timestamp
       // Setting the answerPending to false mimics the requests that have been answered
       this._state[statePush.name] = {
@@ -192,23 +170,21 @@
       };
 
       this._signalUpdate(statePush.name);
-
     },
 
     // handle activity error should send state-update signal with error
     _handleActivityError: function (e) {
-      var stateError = e.detail;
-      stateError.error.handler.handled = true;
-      var existing = this._stateExists(stateError.name);
+      //console.log("Handle activity error.");
+      var existing = this._state[e.detail.name];
+      e.detail.error.handler.handled = true;
 
-      // when disableErrorCodeHandler is true -> cache a response and signal 'state-update'
+      // disableErrorCodeHandler is true -> cache a response and signal update
       if (existing != undefined && existing.disableErrorCodeHandler == true) {
-        if (stateError.error.response.ErrorCode != 0 || stateError.error.response.ErrorCode == 0) {
-          this._cacheStateError(stateError);
-          this._signalUpdate(stateError.name);
+        if (e.detail.error.response.ErrorCode != 0 || e.detail.error.response.ErrorCode == 0) {
+          this._handleStatePush(e);
         }
       } else {
-        // disabledErrorCodeHandler is false -> do not cache and do not signal 'state-error'
+        // disabledErrorCodeHandler is false -> do not cache and do not signal an update
         return;
       }
     },
