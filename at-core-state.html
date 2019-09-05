@@ -180,9 +180,7 @@
 
       // disableErrorCodeHandler is true -> cache a response and signal update
       if (existing != undefined && existing.disableErrorCodeHandler == true) {
-        if (e.detail.error.response.ErrorCode != 0 || e.detail.error.response.ErrorCode == 0) {
           this._handleStatePush(e);
-        }
       } else {
         // disabledErrorCodeHandler is false -> do not cache and do not signal an update
         return;
