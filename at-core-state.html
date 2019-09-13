@@ -176,7 +176,7 @@
     _handleActivityError: function (e) {
       //console.log("Handle activity error.");
       var existing = this._state[e.detail.name];
-      e.detail.error.handler.handled = true;
+      e.detail.response.handler.handled = true;
 
       // disableErrorCodeHandler is true -> cache a response and signal update
       if (existing != undefined && existing.disableErrorCodeHandler == true) {
