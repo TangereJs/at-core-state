@@ -57,7 +57,7 @@
 
     _signalUpdate: function (stateName) {
       var state = this._state[stateName];
-      //console.log("state cached answer " + stateName);   
+      //console.log("state cached answer " + stateName);
 
       // state-update should have only name, version and response
       var stateUpdate = {
@@ -79,8 +79,11 @@
       // cache state request
       if (!this._stateExists(stateRequest.name)) {
         this._state[stateRequest.name] = stateRequest;
+      } else {
+        // deduplicate already existing request
+        if (this._state[stateRequest.name].answerPending) return;
       }
-      
+
       if (stateRequest.name.indexOf("state://") < 0) {   // state:// requests are just in memory and not requested from a server
         this.$.activityQueue.addRequest(stateRequest);
       }
@@ -88,7 +91,7 @@
       this._state[stateRequest.name].answerPending = true;
     },
 
-    _handleStatePoll: function(event) {
+    _handleStatePoll: function (event) {
       var statePoll = event.detail;
       statePoll.name = statePoll.url;
 
@@ -115,10 +118,7 @@
       if (stateRequest.maxAge === 0) {
         if (this._stateExists(stateRequest.name)) {
           var existing = this._state[stateRequest.name];
-
-          if (existing.answerPending == true) {
-            return;
-          }
+          if (existing.answerPending == true) return;
 
           this._clearStateFromCache(stateRequest.name);
         }
@@ -129,9 +129,13 @@
 
       // If maxAge is false -> always return cached state if existing. Otherwise, cache and send a new one
       if (stateRequest.maxAge === false) {
+
         if (this._stateExists(stateRequest.name)) {
-          this._signalUpdate(stateRequest.name);
-          return;
+          var existing = this._state[stateRequest.name];
+          if (!existing.answerPending == true) {
+            this._signalUpdate(stateRequest.name);
+            return;
+          }
         }
 
         this._requestQueueAndCache(stateRequest);
@@ -166,10 +170,10 @@
       if (cachedState.answerPending != false) debugger;
 
       // If the request is cached and requested within last cacheDurtion -> return cached response
-      if ( milliSecondsPassed <= cacheDuration) {
+      if (milliSecondsPassed <= cacheDuration) {
         this._signalUpdate(stateRequest.name);
         return;
-      } else  {
+      } else {
         // If the request cache is expired  -> clear cache and send a new request
         this._clearStateFromCache(stateRequest.name);
         this._requestQueueAndCache(stateRequest);
@@ -192,7 +196,7 @@
           return;
         }
       }
-            
+
       //console.log("state push " + statePush.name);
       // Set  version -> set data -> set answerPending to false -> set timestamp
       // Setting the answerPending to false mimics the requests that have been answered
@@ -214,7 +218,7 @@
 
       // disableErrorCodeHandler is true -> cache a response and signal update
       if (existing != undefined && existing.disableErrorCodeHandler == true) {
-          this._handleStatePush(e);
+        this._handleStatePush(e);
       } else {
         // disabledErrorCodeHandler is false -> do not cache and do not signal an update
         return;
