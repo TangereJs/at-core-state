@@ -11,7 +11,7 @@
       }
     </style>
 
-    <at-core-signals id="coreSignals" on-state-request="_handleStateRequest" on-state-push="_handleStatePush"></at-core-signals>
+    <at-core-signals id="coreSignals" on-state-request="_handleStateRequest" on-state-push="_handleStatePush" on-state-poll="_handleStatePoll"></at-core-signals>
     <at-core-activity-queue id="activityQueue" on-response="_handleActivityResponse" on-error="_handleActivityError"></at-core-activity-queue>
 
   </template>
@@ -73,9 +73,18 @@
       if (!this._stateExists(stateRequest.name)) {
         this._state[stateRequest.name] = stateRequest;
       }
+      
+      if (stateRequest.name.indexOf("state://") < 0) {   // state:// requests are just in memory and not requested from a server
+        this.$.activityQueue.addRequest(stateRequest);
+      }
 
-      this.$.activityQueue.addRequest(stateRequest);
       this._state[stateRequest.name].answerPending = true;
+    },
+
+    _handleStatePoll: function(event) {
+
+      // *todo* replace with poll logic
+      _handleStateRequest(event);
     },
 
     _handleStateRequest: function (event) {
@@ -158,6 +167,7 @@
       if (statePush.url != undefined) {
         statePush.name = statePush.url;
       }
+            
 
       //console.log("state push " + statePush.name);
       // Set  version -> set data -> set answerPending to false -> set timestamp
