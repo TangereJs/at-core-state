@@ -57,12 +57,19 @@
 
     _signalUpdate: function (stateName) {
       var state = this._state[stateName];
-      //console.log("state cached answer " + stateName);     
+      //console.log("state cached answer " + stateName);   
+
+      // state-update should have only name, version and response
+      var stateUpdate = {
+        name: state.data.name,
+        version: state.version,
+        response: state.data.response
+      }
 
       if (state.answerPending == false) {
         this.async(function () {
           //console.log("state answer async " + stateName);
-          Polymer.signal('state-update', state);
+          Polymer.signal('state-update', stateUpdate);
         });
       }
     },
@@ -82,9 +89,18 @@
     },
 
     _handleStatePoll: function(event) {
+      var statePoll = event.detail;
+      statePoll.name = statePoll.url;
 
-      // *todo* replace with poll logic
-      _handleStateRequest(event);
+      if (this._stateExists(statePoll.name)) {
+        var existing = this._state[statePoll.name];
+
+        if (existing.answerPending == true) {
+          return;
+        }
+      }
+
+      this.$.activityQueue.addRequest(statePoll);
     },
 
     _handleStateRequest: function (event) {
@@ -167,8 +183,16 @@
       if (statePush.url != undefined) {
         statePush.name = statePush.url;
       }
-            
 
+      if (this._stateExists(statePush.name)) {
+        var existing = this._state[statePush.name];
+
+        if (existing.answerPending == false && statePush.response.Data._hash == existing.data.response.Data._hash) {
+          this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now());
+          return;
+        }
+      }
+            
       //console.log("state push " + statePush.name);
       // Set  version -> set data -> set answerPending to false -> set timestamp
       // Setting the answerPending to false mimics the requests that have been answered
