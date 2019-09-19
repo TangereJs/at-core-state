@@ -59,6 +59,8 @@
       var state = this._state[stateName];
       //console.log("state cached answer " + stateName);
 
+      if (!state.data || !state.data.name) debugger;
+
       // state-update should have only name, version and response
       var stateUpdate = {
         name: state.data.name,
@@ -95,15 +97,7 @@
       var statePoll = event.detail;
       statePoll.name = statePoll.url;
 
-      if (this._stateExists(statePoll.name)) {
-        var existing = this._state[statePoll.name];
-
-        if (existing.answerPending == true) {
-          return;
-        }
-      }
-
-      this.$.activityQueue.addRequest(statePoll);
+      this._requestQueueAndCache(statePoll);
     },
 
     _handleStateRequest: function (event) {
