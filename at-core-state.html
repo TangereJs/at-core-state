@@ -185,8 +185,9 @@
       if (this._stateExists(statePush.name)) {
         var existing = this._state[statePush.name];
 
-        if (existing.answerPending == false && statePush.response.Data._hash == existing.data.response.Data._hash) {
-          this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now());
+        // ignore/deduplicate responses/states with same hash
+        if (existing.answerPending == false && typeof statePush.response.Data._hash != "undefined" && statePush.response.Data._hash == existing.data.response.Data._hash) {
+          this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now()); // just update cache age 
           return;
         }
       }
