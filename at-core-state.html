@@ -69,8 +69,14 @@
       }
 
       if (state.answerPending == false) {
+
+        if (this._isOfflineCache(stateName)) {         
+          // save state in offline cache
+          localStorage.setItem(stateName, JSON.stringify(stateUpdate));
+        }
+
         this.async(function () {
-          //console.log("state answer async " + stateName);
+          // console.log("state-update state answer async " + stateName);
           Polymer.signal('state-update', stateUpdate);
         });
       }
@@ -152,6 +158,13 @@
 
       // If the request is not cached -> send a new request, add it to cache and set request.answerPending to "true" (equal to "SENT")
       if (cachedState == undefined) {
+        console.log("state-request " + stateRequest.name);
+        debugger;
+        if (this._isOfflineCache(stateRequest.name)) {
+          // start with offline data but still request fresh data
+          var state = localStorage.getItem(stateRequest.name);
+          if (state) Polymer.signalAsync('state-update', JSON.parse(state));
+        }
         this._requestQueueAndCache(stateRequest);
         return;
       }
@@ -224,6 +237,12 @@
       //console.log("Handle activity response.");
       this._handleStatePush(event);
     },
+
+    _isOfflineCache(service) {
+      // check if service should be cached
+      // for now just hardcoded type
+      return service.indexOf("service://cardData/") == 0;
+    }
 
   });
 </script>
