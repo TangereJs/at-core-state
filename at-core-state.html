@@ -69,10 +69,10 @@
       }
 
       if (state.answerPending == false) {
-
+        
         if (this._isOfflineCache(stateName)) {         
           // save state in offline cache
-          localStorage.setItem(stateName, JSON.stringify(stateUpdate));
+          localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
         }
 
         this.async(function () {
@@ -159,10 +159,10 @@
       // If the request is not cached -> send a new request, add it to cache and set request.answerPending to "true" (equal to "SENT")
       if (cachedState == undefined) {
         console.log("state-request " + stateRequest.name);
-        debugger;
+        
         if (this._isOfflineCache(stateRequest.name)) {
           // start with offline data but still request fresh data
-          var state = localStorage.getItem(stateRequest.name);
+          var state = localStorage.getItem(this._offlineCacheKey(stateRequest.name));
           if (state) Polymer.signalAsync('state-update', JSON.parse(state));
         }
         this._requestQueueAndCache(stateRequest);
@@ -238,10 +238,14 @@
       this._handleStatePush(event);
     },
 
-    _isOfflineCache(service) {
+    _isOfflineCache: function (service) {
       // check if service should be cached
       // for now just hardcoded type
       return service.indexOf("service://cardData/") == 0;
+    },
+
+    _offlineCacheKey: function (service) {      
+      return (Tangere.session.user.UserCacheKey || Tangere.session.user.UserName) + "." + service;
     }
 
   });
