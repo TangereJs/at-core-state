@@ -69,10 +69,15 @@
       }
 
       if (state.answerPending == false) {
-        
-        if (this._isOfflineCache(stateName)) {         
-          // save state in offline cache
-          localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
+
+        if (this._isOfflineCache(stateName)) {
+          if(!!state.data.response.ErrorCode) {
+            // when response contains error do not cache and invalidate last cached item
+            localStorage.removeItem(this._offlineCacheKey(stateName));
+          } else {
+            // save state in offline cache
+            localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
+          }
         }
 
         this.async(function () {
@@ -159,7 +164,7 @@
       // If the request is not cached -> send a new request, add it to cache and set request.answerPending to "true" (equal to "SENT")
       if (cachedState == undefined) {
         console.log("state-request " + stateRequest.name);
-        
+
         if (this._isOfflineCache(stateRequest.name)) {
           // start with offline data but still request fresh data
           var state = localStorage.getItem(this._offlineCacheKey(stateRequest.name));
@@ -200,7 +205,7 @@
 
         // ignore/deduplicate responses/states with same hash
         if (existing.answerPending == false && typeof statePush.response.Data._hash != "undefined" && statePush.response.Data._hash == existing.data.response.Data._hash) {
-          this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now()); // just update cache age 
+          this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now()); // just update cache age
           return;
         }
       }
@@ -244,7 +249,7 @@
       return service.indexOf("service://cardData/") == 0;
     },
 
-    _offlineCacheKey: function (service) {      
+    _offlineCacheKey: function (service) {
       return (Tangere.session.user.UserCacheKey || Tangere.session.user.UserName) + "." + service;
     }
 
