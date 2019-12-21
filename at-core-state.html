@@ -115,7 +115,7 @@
       var stateRequest = event.detail;
       stateRequest.name = stateRequest.url;
       //console.log("state request " + stateRequest.name);
-
+      
       // default cache duration in milliseconds
       var cacheDuration = 10000;
 
@@ -245,8 +245,8 @@
 
     _isOfflineCache: function (service) {
       // check if service should be cached
-      // for now just hardcoded type
-      return service.indexOf("service://cardData/") == 0;
+      // for now just hardcoded type            
+      return service.indexOf("service://cardData") == 0 || service.indexOf("state://briefing") == 0;
     },
 
     _offlineCacheKey: function (service) {
