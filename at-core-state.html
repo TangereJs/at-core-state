@@ -71,7 +71,7 @@
       if (state.answerPending == false) {
 
         if (this._isOfflineCache(stateName)) {
-          if(!!state.data.response.ErrorCode) {
+          if (!!state.data.response.ErrorCode) {
             // when response contains error do not cache and invalidate last cached item
             localStorage.removeItem(this._offlineCacheKey(stateName));
           } else {
@@ -79,11 +79,10 @@
             localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
           }
         }
+        
+        // console.log("state-update state answer async " + stateName);
+        Polymer.signalAsync('state-update', stateUpdate);
 
-        this.async(function () {
-          // console.log("state-update state answer async " + stateName);
-          Polymer.signal('state-update', stateUpdate);
-        });
       }
     },
 
@@ -115,7 +114,7 @@
       var stateRequest = event.detail;
       stateRequest.name = stateRequest.url;
       //console.log("state request " + stateRequest.name);
-      
+
       // default cache duration in milliseconds
       var cacheDuration = 10000;
 
@@ -245,7 +244,7 @@
 
     _isOfflineCache: function (service) {
       // check if service should be cached
-      // for now just hardcoded type            
+      // for now just hardcoded type
       return service.indexOf("service://cardData") == 0 || service.indexOf("state://briefing") == 0;
     },
 
