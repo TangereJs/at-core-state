@@ -79,9 +79,9 @@
             localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
           }
         }
-        
+
         // console.log("state-update state answer async " + stateName);
-        Polymer.signalAsync('state-update', stateUpdate);
+        Polymer.signalAsync('state-update', stateName, stateUpdate);        
 
       }
     },
@@ -162,13 +162,14 @@
 
       // If the request is not cached -> send a new request, add it to cache and set request.answerPending to "true" (equal to "SENT")
       if (cachedState == undefined) {
-        console.log("state-request " + stateRequest.name);
+        //console.log("state-request " + stateRequest.name);
 
         if (this._isOfflineCache(stateRequest.name)) {
           // start with offline data but still request fresh data
           var state = localStorage.getItem(this._offlineCacheKey(stateRequest.name));
           if (state) Polymer.signalAsync('state-update', JSON.parse(state));
         }
+
         this._requestQueueAndCache(stateRequest);
         return;
       }
@@ -203,9 +204,13 @@
         var existing = this._state[statePush.name];
 
         // ignore/deduplicate responses/states with same hash
-        if (existing.answerPending == false && typeof statePush.response.Data._hash != "undefined" && statePush.response.Data._hash == existing.data.response.Data._hash) {
-          this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now()); // just update cache age
-          return;
+        if (existing.answerPending == false && typeof statePush.response.Data._hash != "undefined") {
+          if (statePush.response.Data._hash == existing.data.response.Data._hash) {
+            this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now()); // just update cache age
+            return;
+          } else {
+            console.log("_hash change " + statePush.name + " " + statePush.response.Data._hash + " " + existing.data.response.Data._hash)
+          }
         }
       }
 
