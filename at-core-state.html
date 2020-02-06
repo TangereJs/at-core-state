@@ -76,12 +76,18 @@
             localStorage.removeItem(this._offlineCacheKey(stateName));
           } else {
             // save state in offline cache
-            localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
+            try {
+              localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
+            } catch (err) {
+              // remove cached item when serialization fails
+              console.error(err);
+              localStorage.removeItem(this._offlineCacheKey(stateName));
+            }
           }
         }
 
         // console.log("state-update state answer async " + stateName);
-        Polymer.signalAsync('state-update', stateName, stateUpdate);        
+        Polymer.signalAsync('state-update', stateName, stateUpdate);
 
       }
     },
