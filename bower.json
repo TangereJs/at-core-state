@@ -1,6 +1,6 @@
 {
   "name": "at-core-state",
-  "version": "0.0.1.25",
+  "version": "0.0.1.52",
   "private": true,
   "dependencies": {
     "polymer": "Polymer/polymer#master"

@@ -57,7 +57,7 @@
 
     _signalUpdate: function (stateName) {
       var state = this._state[stateName];
-      //console.log("state cached answer " + stateName);
+      // console.log("_signalUpdate " + stateName);
 
       if (!state.data || !state.data.name) debugger;
 
@@ -68,28 +68,38 @@
         response: state.data.response
       }
 
-      if (state.answerPending == false) {
+      // requests can be pushed from e.g. poll - so there is not always a anwserPending request for a response
+      // not sure why check existed at all
+      //if (state.answerPending == false) {
 
-        if (this._isOfflineCache(stateName)) {
-          if (!!state.data.response.ErrorCode) {
-            // when response contains error do not cache and invalidate last cached item
-            localStorage.removeItem(this._offlineCacheKey(stateName));
-          } else {
-            // save state in offline cache
-            try {
-              localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
-            } catch (err) {
-              // remove cached item when serialization fails
-              console.error(err);
-              localStorage.removeItem(this._offlineCacheKey(stateName));
+      if (this._isOfflineCache(stateName)) {
+        if (!!state.data.response.ErrorCode) {
+          // when response contains error do not cache and invalidate last cached item
+          localStorage.removeItem(this._offlineCacheKey(stateName));
+        } else {
+          // save state in offline cache
+          try {
+            var oldState = localStorage.getItem(this._offlineCacheKey(stateName));
+            if (oldState) {
+              oldState = JSON.parse(oldState);
+              if (oldState.response.Data._ts > stateUpdate.response.Data._ts) {
+                // console.log(this._offlineCacheKey(stateRequest.name) + " discard update");
+                stateUpdate = oldState; // discard 'updates' older then current state
+              }
             }
+            localStorage.setItem(this._offlineCacheKey(stateName), JSON.stringify(stateUpdate));
+          } catch (err) {
+            // remove cached item when serialization fails
+            console.error(err);
+            localStorage.removeItem(this._offlineCacheKey(stateName));
           }
         }
-
-        // console.log("state-update state answer async " + stateName);
-        Polymer.signalAsync('state-update', stateName, stateUpdate);
-
       }
+
+      // console.log("state-update state answer async " + stateName);
+      Polymer.signalAsync('state-update', stateName, stateUpdate);
+
+      //}
     },
 
     _requestQueueAndCache: function (stateRequest) {
@@ -102,9 +112,9 @@
         if (this._state[stateRequest.name].answerPending) return;
       }
 
-      if (stateRequest.name.indexOf("state://") < 0) {   // state:// requests are just in memory and not requested from a server
+      if (stateRequest.name.indexOf("state://") < 0) {   // state:// requests are just in memory and not requested from a server        
         this.$.activityQueue.addRequest(stateRequest);
-      }
+      } 
 
       this._state[stateRequest.name].answerPending = true;
     },
@@ -119,10 +129,11 @@
     _handleStateRequest: function (event) {
       var stateRequest = event.detail;
       stateRequest.name = stateRequest.url;
-      //console.log("state request " + stateRequest.name);
+      console.log("state request " + stateRequest.name);
 
       // default cache duration in milliseconds
       var cacheDuration = 10000;
+      if (this._isOfflineCache(stateRequest.name)) cacheDuration = 60 * 60 * 1000; // when offline cache is used cache 1hr in memory
 
       // If maxAge is 0 -> always clear old state from cache if existing, cache and send a new one
       if (stateRequest.maxAge === 0) {
@@ -168,12 +179,17 @@
 
       // If the request is not cached -> send a new request, add it to cache and set request.answerPending to "true" (equal to "SENT")
       if (cachedState == undefined) {
-        //console.log("state-request " + stateRequest.name);
+        console.log("state-request cache check " + stateRequest.name);
 
         if (this._isOfflineCache(stateRequest.name)) {
           // start with offline data but still request fresh data
           var state = localStorage.getItem(this._offlineCacheKey(stateRequest.name));
-          if (state) Polymer.signalAsync('state-update', JSON.parse(state));
+          //console.log(this._offlineCacheKey(stateRequest.name) + " cached: " + !!state);
+          if (state) {
+            var stateUpdate = JSON.parse(state);
+            //console.log(this._offlineCacheKey(stateRequest.name) + " hash: " + stateUpdate.response.Data._hash, " ts: " + stateUpdate.response.Data._ts);
+            Polymer.signalAsync('state-update');
+          }
         }
 
         this._requestQueueAndCache(stateRequest);
@@ -206,16 +222,26 @@
         statePush.name = statePush.url;
       }
 
+      if (!statePush.response.Data._ts) statePush.response.Data._ts = (new Date()).toJSON(); // set current time if server didn't provide time stamp
+
       if (this._stateExists(statePush.name)) {
         var existing = this._state[statePush.name];
 
         // ignore/deduplicate responses/states with same hash
         if (existing.answerPending == false && typeof statePush.response.Data._hash != "undefined") {
+
+          if (statePush.response.Data._ts && existing.data.response.Data._ts) {
+            if (statePush.response.Data._ts <= existing.data.response.Data._ts) {
+              console.log("ignored older data " + statePush.name + " " + statePush.response.Data._ts + " " + existing.data.response.Data._ts);
+              return; // ignore older data
+            }
+          }
+
           if (statePush.response.Data._hash == existing.data.response.Data._hash) {
             this._state[statePush.name].cacheTimeStamp = Math.floor(Date.now()); // just update cache age
             return;
           } else {
-            console.log("_hash change " + statePush.name + " " + statePush.response.Data._hash + " " + existing.data.response.Data._hash)
+            console.log("_hash change " + statePush.name + " " + statePush.response.Data._hash + " " + existing.data.response.Data._hash);
           }
         }
       }
