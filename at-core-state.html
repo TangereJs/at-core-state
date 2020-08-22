@@ -68,10 +68,6 @@
         response: state.data.response
       }
 
-      // requests can be pushed from e.g. poll - so there is not always a anwserPending request for a response
-      // not sure why check existed at all
-      //if (state.answerPending == false) {
-
       if (this._isOfflineCache(stateName)) {
         if (!!state.data.response.ErrorCode) {
           // when response contains error do not cache and invalidate last cached item
@@ -181,6 +177,7 @@
       if (cachedState == undefined) {
         console.log("state-request cache check " + stateRequest.name);
 
+        var delayRequest = false;
         if (this._isOfflineCache(stateRequest.name)) {
           // start with offline data but still request fresh data
           var state = localStorage.getItem(this._offlineCacheKey(stateRequest.name));
@@ -189,10 +186,16 @@
             var stateUpdate = JSON.parse(state);
             //console.log(this._offlineCacheKey(stateRequest.name) + " hash: " + stateUpdate.response.Data._hash, " ts: " + stateUpdate.response.Data._ts);
             Polymer.signalAsync('state-update');
+            delayRequest = true; // we have cached data, so postpone first request for faster inital load
+          } else {
+            // new request 
           }
         }
 
-        this._requestQueueAndCache(stateRequest);
+        this.async(function () {
+          this._requestQueueAndCache(stateRequest);
+        }, delayRequest ? 500 : 10);
+
         return;
       }
 
